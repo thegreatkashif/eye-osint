@@ -1,24 +1,17 @@
 """EYE OSINT Platform API."""
 
-import os
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from sqlalchemy import create_engine, text
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://eye:dev-only-change-me@localhost:5432/eye",
-)
+from app.api import router as investigations_router
+from app.database import engine
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=3,
-    max_overflow=2,
-    pool_timeout=5,
-)
+logger = logging.getLogger("eye.health")
 
 
 @asynccontextmanager
@@ -30,16 +23,27 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="EYE OSINT Platform API",
     description="Open Intelligence & Geospatial Analysis Platform by thegreatkashif",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
+
+# Local-development origins only. CORS is not authentication.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+
+app.include_router(investigations_router)
 
 
 @app.get("/", tags=["System"])
 def root():
     return {
         "name": "EYE",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "maintainer": "thegreatkashif",
         "status": "running",
     }
@@ -56,6 +60,8 @@ def readiness():
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
     except SQLAlchemyError:
+        # Keep details in server logs; never send connection strings to clients.
+        logger.exception("Database readiness check failed")
         raise HTTPException(
             status_code=503,
             detail="Database unavailable",

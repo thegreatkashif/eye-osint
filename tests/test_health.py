@@ -10,6 +10,7 @@ def test_root_has_project_identity():
     assert response.status_code == 200
     assert response.json()["name"] == "EYE"
     assert response.json()["maintainer"] == "thegreatkashif"
+    assert response.json()["version"] == "0.2.0"
 
 
 def test_liveness():
@@ -21,4 +22,4 @@ def test_liveness():
 def test_openapi_is_available():
     response = client.get("/openapi.json")
     assert response.status_code == 200
-    assert response.json()["info"]["version"] == "0.1.0"
+    assert response.json()["info"]["version"] == "0.2.0"
